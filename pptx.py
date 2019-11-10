@@ -54,7 +54,7 @@ class Main(object):
             os.path.dirname(manimlib.addon_helper.movie_paths[0]), "partial_movie_files", Main.CONFIG['scene_names'][0]
         )
         Main.log_line("PART_DIR = " + PART_DIR)
-        parts = glob.glob(os.path.join(PART_DIR, "*.mp4"))
+        parts = sorted(glob.glob(os.path.join(PART_DIR, "*.mp4")))
         read_parts = PART_DIR
 
         # Go through each video part and copy it over to the temporary directory.
@@ -71,7 +71,7 @@ class Main(object):
 
         save_dir = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), Main.CONFIG['scene_names'][0] + ".pptx")
         slide_layout = prs.slide_layouts[SLD_BLANK]
-        for file in glob.glob(os.path.join(read_parts, "*.mp4")):
+        for file in sorted(glob.glob(os.path.join(read_parts, "*.mp4"))):
             Main.log_line("Using file at " + file)
             # Load the example presentation and its timing element
             prs_ex = Presentation(Main.EXAMPLE_PPTX)
