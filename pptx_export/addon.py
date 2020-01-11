@@ -11,7 +11,7 @@ from pptx import Presentation
 
 class Main:
     # Constants
-    PACKAGE_NAME = "PPTX"
+    PACKAGE_NAME = "pptx_export"
     CUR_DIR = os.path.join(ADDON_DIR, PACKAGE_NAME)
     TEMPLATE_DIR = os.path.join(CUR_DIR, "templates")
     TEMPLATE_PPTX = os.path.join(TEMPLATE_DIR, "template.pptx")
