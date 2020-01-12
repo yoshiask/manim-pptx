@@ -8,90 +8,112 @@ from manimlib.scene.scene_file_writer import *
 
 from pptx import Presentation
 
-
-class Main:
-    # Constants
+class Addon:
     PACKAGE_NAME = "pptx_export"
+
     CUR_DIR = os.path.join(ADDON_DIR, PACKAGE_NAME)
     TEMPLATE_DIR = os.path.join(CUR_DIR, "templates")
     TEMPLATE_PPTX = os.path.join(TEMPLATE_DIR, "template.pptx")
     EXAMPLE_PPTX = os.path.join(TEMPLATE_DIR, "powerpoint.pptx")
     TEMPORARY_DIR = os.path.join(CUR_DIR, "temporary")
-    LOG_DIR = os.path.join(CUR_DIR, 'pptx.log')
-    CONFIG = { }
-
-    def __str__():
-        return Main.PACKAGE_NAME
-
-    def set_config(cfg):
+    LOG_DIR = os.path.join(CUR_DIR, 'pptx_export.log')
+        
+    def addon_info(self):
+        # Information about the addon
+        return {
+            "author": "Joshua \"Yoshi\" Askharoun",
+            "name": Addon.PACKAGE_NAME,
+            "version" : "1.0.1.0",
+            "desc": "Adds --save_to_pptx, which generates a PowerPoint with a slide for each animation"
+        }
+    
+    def cli_args(self):
+        # Command-line flags added by the addon
+        return [
+            {
+                "flag": "--save_to_pptx",
+                "action": "store_true",
+                "help": f"[{Addon.PACKAGE_NAME}] Render the animations to a PowerPoint presentation"
+            },
+            {
+                "flag": "--anti_dupli_pptx",
+                "action": "store_true",
+                "help": f"[{Addon.PACKAGE_NAME}] When exporting to PowerPoint, only use every other movie part"
+            }
+        ]
+    
+    def __str__(self):
+        return self.PACKAGE_NAME
+    
+    def set_config(self, config):
         # Fires after the cli arguments are parsed in __init__.py for addons to have access to the current config
-        Main.CONFIG = cfg
+        self.config = config
 
-    def loaded():
+    def loaded(self):
         # Fires when the addon is first initialized by manim
-        #Main.verbose("{0} addon loaded successfully".format(Main.addon_info()['name']))
+        #self.verbose("{0} addon loaded successfully".format(self.addon_info()['name']))
         return True
 
-    def on_rendered():
+    def on_rendered(self, scene_classes):
         # Fires when a video is finished rendering
-        if Main.CONFIG["all_args"].save_to_pptx:
-            Main.create_ppt()
+        if self.config["all_args"].save_to_pptx:
+            self.create_ppt(scene_classes)
 
-    def create_ppt():
+    def create_ppt(self, scene_classes):
         SLD_BLANK = 6
-        if not os.path.exists(Main.TEMPORARY_DIR):
-            os.makedirs(Main.TEMPORARY_DIR)
-        if os.path.exists(Main.LOG_DIR):
-            os.remove(Main.LOG_DIR)
-        prs = Presentation(Main.TEMPLATE_PPTX)
+        if not os.path.exists(Addon.TEMPORARY_DIR):
+            os.makedirs(Addon.TEMPORARY_DIR)
+        if os.path.exists(Addon.LOG_DIR):
+            os.remove(Addon.LOG_DIR)
+        prs = Presentation(self.TEMPLATE_PPTX)
         
         # Figure out where the movie parts are saved
         PART_DIR = os.path.join(
-            os.path.dirname(manimlib.addon_helper.movie_paths[0]), "partial_movie_files", Main.CONFIG['scene_names'][0]
+            os.path.dirname(manimlib.addon_helper.movie_paths[0]), "partial_movie_files", scene_classes[0].__name__
         )
-        Main.log_line("PART_DIR = " + PART_DIR)
+        self.log_line("PART_DIR = " + PART_DIR)
         parts = sorted(glob.glob(os.path.join(PART_DIR, "*.mp4")))
         read_parts = PART_DIR
 
         # Go through each video part and copy it over to the temporary directory.
         # If anti-duplicate is on, every other part is combined with the one before it and then copied over to the temp directory
-        if Main.CONFIG["all_args"].anti_dupli_pptx:
-            Main.log_line("Anti-duplication manually enabled")
-            read_parts = Main.TEMPORARY_DIR
+        if self.config["all_args"].anti_dupli_pptx:
+            self.log_line("Anti-duplication manually enabled")
+            read_parts = Addon.TEMPORARY_DIR
             for file in parts:
-                i = int(Main.get_name(file))
+                i = int(self.get_name(file))
                 if not i % 2 == 0:
-                    Main.log_line("Merging parts {} and {}...".format(str(i), str(i-1)))
-                    merged_clip = Main.merge_videos(parts[i-1], file, os.path.join(Main.TEMPORARY_DIR, str(i-1).zfill(5) + ".mp4"))
-                    Main.log_line("Merged to " + merged_clip)
+                    self.log_line("Merging parts {} and {}...".format(str(i), str(i-1)))
+                    merged_clip = self.merge_videos(parts[i-1], file, os.path.join(Addon.TEMPORARY_DIR, str(i-1).zfill(5) + ".mp4"))
+                    self.log_line("Merged to " + merged_clip)
 
-        save_dir = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), Main.CONFIG['scene_names'][0] + ".pptx")
+        save_dir = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), self.config['scene_names'][0] + ".pptx")
         slide_layout = prs.slide_layouts[SLD_BLANK]
         for file in sorted(glob.glob(os.path.join(read_parts, "*.mp4"))):
-            Main.log_line("Using file at " + file)
+            self.log_line("Using file at " + file)
             # Load the example presentation and its timing element
-            prs_ex = Presentation(Main.EXAMPLE_PPTX)
+            prs_ex = Presentation(self.EXAMPLE_PPTX)
             timing_ex = prs_ex.slides[0].element[2]
-            Main.log_line("\tGrabbed timing element, timing_ex = " + str(timing_ex))
+            self.log_line("\tGrabbed timing element, timing_ex = " + str(timing_ex))
             # Create a new slide
             slide = prs.slides.add_slide(slide_layout)
             # Generate video thumbnail
-            thumb_file = os.path.join(Main.TEMPORARY_DIR, Main.get_name(file) + ".png")
-            Main.log_line("\tGenerating video thumbnail...")
-            Main.get_video_thumb(file, thumb_file)
-            Main.log_line("\tThumbnail saved at " + thumb_file)
+            thumb_file = os.path.join(Addon.TEMPORARY_DIR, self.get_name(file) + ".png")
+            self.log_line("\tGenerating video thumbnail...")
+            self.get_video_thumb(file, thumb_file)
+            self.log_line("\tThumbnail saved at " + thumb_file)
 
             # Add the video to the slide
             clip = slide.shapes.add_movie(file, 0, 0, prs.slide_width, prs.slide_height, mime_type='video/mp4', poster_frame_image=thumb_file)
-            Main.log_line("\tAdded clip to slide")
+            self.log_line("\tAdded clip to slide")
 
             # Play the clip in fullscreen when the slide starts
             ## Get the id of the movie object we just added
             id = clip.element[0][0].attrib.get("id")
-            Main.log_line("\tClip id = " + id)
+            self.log_line("\tClip id = " + id)
             ## Make a copy of the timing element from the manually created PPTX,
             ## then change every spid to the clip id
-            Main.log_line("\tUsing timing_ex as template...")
+            self.log_line("\tUsing timing_ex as template...")
             timing = timing_ex
             timing[0][0][0][0][0][0][0][0][0][1][0][0][1][0][0][1][0][0][1][0].attrib["spid"] = id
             timing[0][0][0][0][1][0][1][0].attrib["spid"] = id
@@ -99,20 +121,20 @@ class Main:
             timing[0][0][0][0][2][0][2][0][0][1][0][0][1][0][0][1][0][0][1][0].attrib["spid"] = id
             timing[0][0][0][0][2][1][0][0][0].attrib["spid"] = id
             slide.element[2] = timing
-            Main.log_line("\tAdded timing to slide, timing = " + str(timing))
+            self.log_line("\tAdded timing to slide, timing = " + str(timing))
             prs.save(save_dir)
-            Main.log_line("\tPPTX saved to " + save_dir)
+            self.log_line("\tPPTX saved to " + save_dir)
         
-        Main.log_line("Final presentation saved to " + save_dir)
+        self.log_line("Final presentation saved to " + save_dir)
         print("\nPresentation ready at " + save_dir)
-        if Main.CONFIG["all_args"].preview:
-            Main.open_file(save_dir)
+        if self.config["all_args"].preview:
+            self.open_file(save_dir)
 
-    def get_name(filename):
+    def get_name(self, filename):
         pre, ext = os.path.splitext(filename)
         return pre.split(os.sep)[-1]
 
-    def get_video_thumb(filename, imgname):
+    def get_video_thumb(self, filename, imgname):
         command = [
                 FFMPEG_BIN,
                 '-y',  # overwrite output file if it exists
@@ -124,7 +146,7 @@ class Main:
         subprocess.run(command, stdout=subprocess.PIPE)
         return imgname
 
-    def get_frame_count(filename):
+    def get_frame_count(self, filename):
         command = [
             FFPROBE_BIN,
             '-v', 'error',
@@ -138,7 +160,7 @@ class Main:
         return int(result)
 
     # TODO: Make this work
-    def get_middle_video_frame(filename, imgname):
+    def get_middle_video_frame(self, filename, imgname):
         command = [
             FFMPEG_BIN,
             '-y',  # overwrite output file if it exists
@@ -150,8 +172,8 @@ class Main:
         subprocess.run(command, stdout=subprocess.PIPE)
         return imgname
 
-    def merge_videos(clip1, clip2, output):
-        vid_list = os.path.join(Main.TEMPORARY_DIR, "cliplist.txt") 
+    def merge_videos(self, clip1, clip2, output):
+        vid_list = os.path.join(Addon.TEMPORARY_DIR, "cliplist.txt") 
         with open(vid_list, 'w') as file:
             file.write("file '{}'\n".format(clip1))
             file.write("file '{}'".format(clip2))
@@ -167,7 +189,7 @@ class Main:
         subprocess.run(commands, stdout=subprocess.PIPE)
         return output
 
-    def open_file(file_path):
+    def open_file(self, file_path):
         # Taken from open_file_if_needed()
         current_os = platform.system()
         if current_os == "Windows":
@@ -191,32 +213,9 @@ class Main:
             sp.call(commands, stdout=FNULL, stderr=sp.STDOUT)
             FNULL.close()
 
-    def log_line(text):
-        Main.log_text(text.__str__() + "\n")
+    def log_line(self, text):
+        self.log_text(text.__str__() + "\n")
 
-    def log_text(text):
-        with open(Main.LOG_DIR, 'a') as the_file:
+    def log_text(self, text):
+        with open(Addon.LOG_DIR, 'a') as the_file:
             the_file.write(text.__str__())
-
-    def parser_args():
-        # Return any command line flags that the addon adds
-        return [
-            {
-                'flag': "--save_to_pptx",
-                'action': "store_true",
-                'help': "[{0}] Render the animations to a PowerPoint presentation".format(Main.PACKAGE_NAME)
-            },
-            {
-                'flag': "--anti_dupli_pptx",
-                'action': "store_true",
-                'help': "[{0}] When exporting to PowerPoint, only use every other movie part".format(Main.PACKAGE_NAME)
-            }
-        ]
-
-    def addon_info():
-        return {
-            'author': "Joshua \"Yoshi\" Askharoun",
-            'name': Main.PACKAGE_NAME,
-            'version' : "1.0.1.0",
-            'desc': "Adds --save_to_pptx, which generates a PowerPoint with a slide for each animation"
-        }
