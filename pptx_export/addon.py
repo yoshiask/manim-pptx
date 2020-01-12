@@ -42,9 +42,6 @@ class Addon:
             }
         ]
     
-    def __str__(self):
-        return self.PACKAGE_NAME
-    
     def set_config(self, config):
         # Fires after the cli arguments are parsed in __init__.py for addons to have access to the current config
         self.config = config
@@ -57,9 +54,10 @@ class Addon:
     def on_rendered(self, scene_classes):
         # Fires when a video is finished rendering
         if self.config["all_args"].save_to_pptx:
-            self.create_ppt(scene_classes)
+            for scene_class in scene_classes:
+                self.create_ppt(scene_class.__name__)
 
-    def create_ppt(self, scene_classes):
+    def create_ppt(self, scene_name):
         SLD_BLANK = 6
         if not os.path.exists(Addon.TEMPORARY_DIR):
             os.makedirs(Addon.TEMPORARY_DIR)
@@ -68,9 +66,7 @@ class Addon:
         prs = Presentation(self.TEMPLATE_PPTX)
         
         # Figure out where the movie parts are saved
-        PART_DIR = os.path.join(
-            os.path.dirname(manimlib.addon_helper.movie_paths[0]), "partial_movie_files", scene_classes[0].__name__
-        )
+        PART_DIR = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), "partial_movie_files", scene_name)
         self.log_line("PART_DIR = " + PART_DIR)
         parts = sorted(glob.glob(os.path.join(PART_DIR, "*.mp4")))
         read_parts = PART_DIR
@@ -87,7 +83,7 @@ class Addon:
                     merged_clip = self.merge_videos(parts[i-1], file, os.path.join(Addon.TEMPORARY_DIR, str(i-1).zfill(5) + ".mp4"))
                     self.log_line("Merged to " + merged_clip)
 
-        save_dir = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), self.config['scene_names'][0] + ".pptx")
+        save_dir = os.path.join(os.path.dirname(manimlib.addon_helper.movie_paths[0]), scene_name + ".pptx")
         slide_layout = prs.slide_layouts[SLD_BLANK]
         for file in sorted(glob.glob(os.path.join(read_parts, "*.mp4"))):
             self.log_line("Using file at " + file)
@@ -219,3 +215,7 @@ class Addon:
     def log_text(self, text):
         with open(Addon.LOG_DIR, 'a') as the_file:
             the_file.write(text.__str__())
+
+    def __str__(self):
+        return self.PACKAGE_NAME
+    
